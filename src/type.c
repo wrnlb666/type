@@ -1,9 +1,10 @@
 #include "type.h"
 
+typedef struct var_list var_list_t;
 
 struct var {
     var_type_t  type;
-    uint64_t    hash;
+    uint32_t    hash;
     union {
         // basic types
         int64_t     i;
@@ -18,19 +19,24 @@ struct var {
 
         // fix sized array. Struct will be implemented as fix sized array
         struct {
-            uint32_t    len;
+            uint64_t    len;
             var_t*      av;     // array values
-        } a;
+        } *a;
 
         // array like list? 
-        struct {
-            uint32_t    len;
-            struct node {
-                var_t*          vars;       // var_t[8] for now. 
-                struct node*    next;
-            } *lv;              // list values
-        } l;
+        var_list_t*     l;
     } data;
+};
+
+typedef struct var_node var_node_t;
+struct var_node {
+    var_t           vars[8];
+    var_node_t*     next;
+};
+
+struct var_list {
+    uint64_t    len;
+    var_node_t  lv;
 };
 
 

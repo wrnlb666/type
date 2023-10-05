@@ -13,7 +13,8 @@ typedef enum var_type {
     VAR_FLOAT,      // 64 bits double precision floating points
     VAR_STRING,     // C style NULL terminated strings
     VAR_PAIR,       // key-val pair, dict if having an array of pairs
-    VAR_LIST,       // dynamic array for array, struct, and dict with key-val pair
+    VAR_ARRAY,      // fix sized array, struct will be implemented as array
+    VAR_LIST,       // dynamic array for array and dict with key-val pair
 } var_type_t;
 
 typedef struct var var_t;
