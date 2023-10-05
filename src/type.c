@@ -3,6 +3,7 @@
 
 struct var {
     var_type_t  type;
+    uint64_t    hash;
     union {
         // basic types
         int64_t     i;
@@ -10,20 +11,29 @@ struct var {
         double      f;
         char*       s;
 
-        // key-val pair, dict will be implemented as array of pairs
+        // key-val pair, dict will be implemented as list of pairs
         struct {
-            var_t*  key;
-            var_t*  val;
+            var_t*  kv;         // var_t[2]
         } p;
 
-        // array like list? Struct will also be implemented as list
+        // fix sized array. Struct will be implemented as fix sized array
         struct {
             uint32_t    len;
-            uint32_t    cap;
-            var_t*      vars;
+            var_t*      av;     // array values
+        } a;
+
+        // array like list? 
+        struct {
+            uint32_t    len;
+            struct node {
+                var_t*          vars;       // var_t[8] for now. 
+                struct node*    next;
+            } *lv;              // list values
         } l;
     } data;
 };
 
 
-
+size_t foo(void) {
+    return sizeof (var_t);
+}
