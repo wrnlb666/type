@@ -14,6 +14,7 @@ if (ptr == NULL) ERRO("out of memory");
 /*
  * for array and list, varadic arguments should end with `NULL`
  * for array, list, and pair, arg type should be `var_t*`
+ * constructor for array, list, and pair won't add ref to the existing `var_t*`
  * for string, format string is allowed
  * for rest of the types, it should be their corresponding C type. 
  *
@@ -24,6 +25,7 @@ if (ptr == NULL) ERRO("out of memory");
 extern inline var_t* var_init(var_type_t t, ...) {
     var_t* res = malloc(sizeof (var_t));
     MEM_CHECK(res);
+    res->data.u = 0;
 
     // start varadic arguments
     va_list ap;
@@ -64,7 +66,18 @@ extern inline var_t* var_init(var_type_t t, ...) {
         break;
 
         case 'l': {
-
+            // allocate struct memory 
+            res->data.l = malloc(sizeof (var_list_t));
+            MEM_CHECK(res->data.l);
+            
+            // get argument length
+            res->data.l->len = 0;
+            for (var_t* temp = va_arg(ap, var_t*); 
+                temp != NULL; 
+                temp = (res->data.l->len++, va_arg(ap, var_t*)));
+            va_end(ap);
+            
+            // TODO: calculate total needed nodes
         }
         break;
 
