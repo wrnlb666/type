@@ -75,9 +75,33 @@ extern inline var_t* var_init(var_type_t t, ...) {
             for (var_t* temp = va_arg(ap, var_t*); 
                 temp != NULL; 
                 temp = (res->data.l->len++, va_arg(ap, var_t*)));
-            va_end(ap);
-            
+            va_end(ap);    
+            va_start(ap, t);
+
+            // early return if len is 0 
+            if (res->data.l->len == 0) return res;
+
             // TODO: calculate total needed nodes
+            size_t node_count = (res->data.l->len + LIST_SIZE - 1) / LIST_SIZE;
+            
+            // allocate memory
+            var_node_t* curr = &(res->data.l->lv);
+            curr->next = NULL;
+            for (size_t i = 1; i < node_count; i++) {
+                curr->next = malloc(sizeof (var_node_t));
+                MEM_CHECK(curr->next);
+                curr = curr->next;
+                curr->next = NULL;
+            }
+
+            // assign values 
+            curr = &(res->data.l->lv);
+            for (size_t i = 0; i < res->data.l->len; i += LIST_SIZE) {
+                for (size_t j = 0; j < LIST_SIZE && i + j < res->data.l->len; j++) {
+                    curr->vars[i] = va_arg(ap, var_t*);
+                }
+                curr = curr->next;
+            }
         }
         break;
 

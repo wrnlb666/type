@@ -39,9 +39,10 @@ struct var_array {
     var_t**     av;
 };
 
+#define LIST_SIZE 8
 typedef struct var_node var_node_t;
 struct var_node {
-    var_t*          vars[8];
+    var_t*          vars[LIST_SIZE];
     var_node_t*     next;
 };
 
