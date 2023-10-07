@@ -12,8 +12,8 @@ typedef enum var_type {
     VAR_INT     = 'i',  // 64 bits integers
     VAR_UINT    = 'u',  // 64 bits unsigned integers
     VAR_FLOAT   = 'f',  // 64 bits double precision floating points
-    VAR_STRING  = 's',  // C style NULL terminated strings
-    VAR_ARRAY   = 'a',  // fix sized array, struct will be implemented as array, O(1)
+    VAR_STRING  = 's',  // sized string with NULL terminator. Can be used to represent binary data. 
+    VAR_ARRAY   = 'a',  // fix sized array, struct will be implemented as array, random access: O(1)
     VAR_LIST    = 'l',  // dynamic array, random access time would be O(n)
     VAR_DICT    = 'd',  // dict
 } var_type_t;

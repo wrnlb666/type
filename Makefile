@@ -1,6 +1,8 @@
 CC = gcc
 CFLAG = -Wall -Wextra -pedantic -std=c11 -g
 LIB = 
+GCFLAG = -Wall -Wextra -pedantic -std=c11 `pkg-config --cflags bdw-gc` -g -D TYPE_GC
+GCLIB = `pkg-config --libs bdw-gc`
 POST_FIX = 
 ELF_FILES = 
 
@@ -22,8 +24,11 @@ all: type
 
 .PHONY: type
 
-type: src/type.c src/type.h 
-	$(CC) $(CFLAG) -fPIC -shared $< -o lib$@.$(POST_FIX)
+type: src/type.c src/type.h
+	$(CC) $(CFLAG) -fPIC -shared $< -o libtype.$(POST_FIX)
+
+typegc: src/type.c src/type.h
+	$(CC) $(GCFLAG) -fPIC -shared $< -o libtype.$(POST_FIX) $(GCLIB)
 
 test%: test%.c 
 	$(CC) $(CFLAG) $< -o test -Wl,-rpath=./ -lpthread -L. -ltype
