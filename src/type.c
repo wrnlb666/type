@@ -22,10 +22,9 @@ if (ptr == NULL) ERRO("out of memory");
  * @param   ... watch above description
  * @return      pointer to a new `var_t` that currently has one ref
  */
-extern inline var_t* var_init(var_type_t t, ...) {
+var_t* var_init(var_type_t t, ...) {
     var_t* res = malloc(sizeof (var_t));
     MEM_CHECK(res);
-    res->data.u = 0;
 
     // start varadic arguments
     va_list ap;
@@ -52,6 +51,11 @@ extern inline var_t* var_init(var_type_t t, ...) {
             for (size_t i = 0; i < res->data.a->len; i++) {
                 res->data.a->av[i] = va_arg(ap, var_t*);
             }
+        }
+        break;
+
+        case 'd': {
+            // TODO: dictionary requires struct and hash. 
         }
         break;
         
@@ -86,13 +90,12 @@ extern inline var_t* var_init(var_type_t t, ...) {
             
             // allocate memory
             var_node_t* curr = &(res->data.l->lv);
-            curr->next = NULL;
             for (size_t i = 1; i < node_count; i++) {
                 curr->next = malloc(sizeof (var_node_t));
                 MEM_CHECK(curr->next);
                 curr = curr->next;
-                curr->next = NULL;
             }
+            curr->next = NULL;
 
             // assign values 
             curr = &(res->data.l->lv);
@@ -102,11 +105,6 @@ extern inline var_t* var_init(var_type_t t, ...) {
                 }
                 curr = curr->next;
             }
-        }
-        break;
-
-        case 'p': {
-
         }
         break;
 
@@ -146,6 +144,23 @@ extern inline var_t* var_init(var_type_t t, ...) {
     return res;
 }
 
+
+var_t* var_new_int(int64_t i) {
+    var_t* res = malloc(sizeof (var_t));
+    MEM_CHECK(res);
+    res->data.i = i;
+    res->ref = 1;
+    return res;
+}
+
+
+var_t* var_new_uint(uint64_t u) {
+    var_t* res = malloc(sizeof (var_t));
+    MEM_CHECK(res);
+    res->data.u = u;
+    res->ref = 1;
+    return res;
+}
 
 size_t foo(void) {
     return sizeof (var_t);

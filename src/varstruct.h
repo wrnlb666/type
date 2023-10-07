@@ -3,9 +3,9 @@
 
 #include "type.h"
 
-typedef struct var_pair     var_pair_t;
 typedef struct var_array    var_array_t;
 typedef struct var_list     var_list_t;
+typedef struct var_dict     var_dict_t;
 
 struct var {
     var_type_t  type;
@@ -17,21 +17,16 @@ struct var {
         double      f;
         char*       s;
 
-        // key-val pair, dict will be implemented as list of pairs
-        var_pair_t*     p;
-        
         // fix sized array. Struct will be implemented as fix sized array
         var_array_t*    a;
 
         // array like list? 
         var_list_t*     l;
-    } data;
-};
 
-struct var_pair {
-    var_t*      key;
-    var_t*      val;
-    uint64_t    hash;
+        // dict 
+        var_dict_t*     d;
+        // TODO: memory representation of dict
+    } data;
 };
 
 struct var_array {
