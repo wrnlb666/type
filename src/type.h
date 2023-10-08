@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdarg.h>
+#include <stdbool.h>
 
 
 typedef enum var_type {

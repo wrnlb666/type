@@ -1,5 +1,5 @@
 CC = gcc
-CFLAG = -Wall -Wextra -pedantic -std=c11 -g
+CFLAG = -Wall -Wextra -pedantic -std=c11 -g -O3
 LIB = 
 GCFLAG = -Wall -Wextra -pedantic -std=c11 `pkg-config --cflags bdw-gc` -g -D TYPE_GC
 GCLIB = `pkg-config --libs bdw-gc`

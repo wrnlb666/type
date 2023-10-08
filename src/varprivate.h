@@ -65,7 +65,10 @@ struct var_list {
 };
 
 // structs for dict
-#define DICT_SIZE 16
+#define DICT_SIZE   16
+#define DICT_HASH   0xcbf29ce484222325LLU
+#define DICT_PRIME  0x100000001b3LLU
+#define DICT_RATIO  0x9e3779b97f4a7c15LLU
 typedef struct var_dict_elem var_dict_elem_t;
 struct var_dict_elem {
     uint64_t            hash;

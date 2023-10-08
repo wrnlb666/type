@@ -1,4 +1,4 @@
-#include "varstruct.h"
+#include "varprivate.h"
 
 // error msgs
 #define ERRO(msg) \
@@ -12,16 +12,17 @@ if (ptr == NULL) ERRO("out of memory");
 // constructor
 
 /*
- * for array, list, and dict, varadic arguments should end with `NULL`
+ * for array and list varadic arguments should end with `NULL`
  * for array, list, and dict, arg type should be `var_t*`
+ * for dict, arguments should be `var_t* key_arr, var_t* val_arr`
  * for string, format string is allowed
  * for rest of the types, it should be their corresponding C type. 
  *
  * @param   t   type of the `var_t`, can be char or enum 
- * @param   ... watch above description
+ * @param   ... see above description
  * @return      pointer to a new `var_t`
  */
-var_t* var_init(var_type_t t, ...) {
+var_t* var_new(var_type_t t, ...) {
     var_t* res = malloc(sizeof (var_t));
     MEM_CHECK(res);
 
@@ -30,6 +31,37 @@ var_t* var_init(var_type_t t, ...) {
     va_start(ap, t);
 
     switch (t) {
+        case 'i': {
+            res->data.i = va_arg(ap, int64_t);
+        }
+        break;
+
+        case 'u': {
+            res->data.u = va_arg(ap, uint64_t);
+        }
+        break;
+
+        case 'f': {
+            res->data.f = va_arg(ap, double);
+        }
+        break;
+
+        case 's': {
+            char* str = va_arg(ap, char*);
+            int str_len = vsnprintf(NULL, 0, str, ap);
+            va_end(ap);
+            if (str_len < 0) ERRO("invalid format string");
+
+            res->data.s = malloc(sizeof (var_string_t) + str_len + 1);
+            MEM_CHECK(res->data.s);
+
+            res->data.s->len = str_len;
+            va_start(ap, t);
+            va_arg(ap, char*);
+            vsprintf(res->data.s->str, str, ap);
+        }
+        break;
+
         case 'a': {
             // get argument length 
             size_t arr_len = 0;
@@ -47,21 +79,6 @@ var_t* var_init(var_type_t t, ...) {
             for (size_t i = 0; i < res->data.a->len; i++) {
                 res->data.a->av[i] = va_arg(ap, var_t*);
             }
-        }
-        break;
-
-        case 'd': {
-            // TODO: dictionary requires struct and hash. 
-        }
-        break;
-        
-        case 'f': {
-            res->data.f = va_arg(ap, double);
-        }
-        break;
-        
-        case 'i': {
-            res->data.i = va_arg(ap, int64_t);
         }
         break;
 
@@ -104,27 +121,11 @@ var_t* var_init(var_type_t t, ...) {
         }
         break;
 
-        case 's': {
-            char* str = va_arg(ap, char*);
-            int str_len = vsnprintf(NULL, 0, str, ap);
-            va_end(ap);
-            if (str_len < 0) ERRO("invalid format string");
-
-            res->data.s = malloc(sizeof (var_string_t) + str_len + 1);
-            MEM_CHECK(res->data.s);
-
-            res->data.s->len = str_len;
-            va_start(ap, t);
-            va_arg(ap, char*);
-            vsprintf(res->data.s->str, str, ap);
+        case 'd': {
+            // TODO: dictionary requires struct and hash. 
         }
         break;
-
-        case 'u': {
-            res->data.u = va_arg(ap, uint64_t);
-        }
-        break;
-
+        
         default: {
             va_end(ap);
             ERRO("unknown type");
@@ -164,6 +165,12 @@ var_t* var_new_float(double f) {
     return res;
 }
 
+
+/*
+ * @param   s   format string 
+ * @param   ... see `printf`
+ * @return      a sized string 
+ */
 var_t* var_new_string(const char* s, ...) {
     var_t* res = malloc(sizeof (var_t));
     MEM_CHECK(res);
@@ -186,6 +193,10 @@ var_t* var_new_string(const char* s, ...) {
 }
 
 
+/*
+ * @param   size    size of the array/struct/tuple 
+ * @return          an empty array/struct/tuple with size `size`
+ */
 var_t* var_new_array(size_t size) {
     var_t* res = malloc(sizeof (var_t));
     MEM_CHECK(res);
@@ -263,11 +274,97 @@ var_t* var_new_list_empty(void) {
 }
 
 
-var_t* var_new_dict(void) {
-    // TODO: implement dict
+/*
+ * the length of key_arr should be the same with val_arr
+ * dict key will be deep copied. 
+ * 
+ * @param   key_arr array of keys
+ * @param   val_arr array of vals
+ * @return          a new `var_t*` of type `VAR_DICT`
+ */
+var_t* var_new_dict(const var_t* key_arr, const var_t* val_arr) {
+    var_t* res = malloc(sizeof (var_t));
+    MEM_CHECK(res);
+    res->data.d = malloc(sizeof (var_dict_t));
+    MEM_CHECK(res->data.d);
+    res->data.d->mod = DICT_SIZE;
     
+    // TODO: need hash function
+
+    (void) key_arr;
+    (void) val_arr;
     return NULL;
 }
+
+
+/*
+ * list and dict will not be hashable. 
+ * int, uint, float, string, and array are hashable types. 
+ *
+ * @param   var     the `var_t*` that you want to get the hash code from
+ * @param   hash    a pointer to a `uint64_t` that will be used to store the result
+ * @return          if the `var_t*` is hashable or not, if hash succeeded
+ */
+bool var_hash(const var_t* var, uint64_t* hash) {
+    switch (var->type) {
+        case 'i': {
+            *hash = var->data.i;
+            return true;
+        }
+
+        case 'u': {
+            *hash = var->data.u;
+            return true;
+        }
+
+        case 'f': {
+            *hash = *(uint64_t*) (&var->data.f);
+            return true;
+        }
+
+        case 's': {
+            // FNV-1a algorithm for string hashing
+            *hash = (uint64_t) DICT_HASH;
+            const unsigned char* ptr = (const unsigned char*) var->data.s->str;
+
+            for (size_t i = 0; i < var->data.s->len; i++) {
+                *hash ^= (uint64_t) (ptr[i]);
+                *hash *= DICT_PRIME;
+            }
+
+            return true;
+        }
+
+        case 'a': {
+            // combining hashes of all vars inside
+            // old_hash ^= new_hash + 0x9e3779b97f4a7c15 + (old_hash << 6) + (old_hash >> 2);
+            *hash = 0;
+            uint64_t new_hash;
+            for (size_t i = 0; i < var->data.a->len; i++) {
+                if (var_hash(var->data.a->av[i], &new_hash) == false) {
+                    return false;
+                }
+                *hash ^= new_hash + DICT_RATIO + (*hash << 6) + (*hash >> 2);
+            }
+            return true;
+        }
+
+        case 'l': {
+            return false;
+        }
+
+        case 'd': {
+            return false;
+        }
+
+        default: {
+            ERRO("corrupted var");
+        }
+    }
+    return false;
+}
+
+
 
 size_t foo(void) {
     return sizeof (var_t);
