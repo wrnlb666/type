@@ -1,14 +1,6 @@
 #include "type.h"
 #include "varprivate.h"
-
-// error msgs
-#define ERRO(msg) \
-exit((fprintf(stderr, "[ERRO]: " msg "\n"), 1));
-
-// check if allocation returns `NULL`
-#define MEM_CHECK(ptr) \
-if (ptr == NULL) ERRO("out of memory");
-
+#include "varutil.h"
 
 // constructor
 
@@ -28,26 +20,26 @@ var_t* var_new(var_type_t t, ...) {
     MEM_CHECK(res);
 
     // start varadic arguments
-va_list ap;
-va_start(ap, t);
+    va_list ap;
+    va_start(ap, t);
+    
+    switch (t) {
+        case VAR_INT: {
+        res->data.i = va_arg(ap, int64_t);
+        }
+        break;
 
-switch (t) {
-case 'i': {
-res->data.i = va_arg(ap, int64_t);
-}
-break;
-
-        case 'u': {
+        case VAR_UINT: {
             res->data.u = va_arg(ap, uint64_t);
         }
         break;
 
-        case 'f': {
+        case VAR_FLOAT: {
             res->data.f = va_arg(ap, double);
         }
         break;
 
-        case 's': {
+        case VAR_STRING: {
             char* str = va_arg(ap, char*);
             int str_len = vsnprintf(NULL, 0, str, ap);
             va_end(ap);
@@ -63,7 +55,7 @@ break;
         }
         break;
 
-        case 'a': {
+        case VAR_ARRAY: {
             // get argument length 
             size_t arr_len = 0;
             for (var_t* temp = va_arg(ap, var_t*); 
@@ -83,7 +75,7 @@ break;
         }
         break;
 
-        case 'l': {
+        case VAR_LIST: {
             // allocate struct memory 
             res->data.l = malloc(sizeof (var_list_t));
             MEM_CHECK(res->data.l);
@@ -122,7 +114,7 @@ break;
         }
         break;
 
-        case 'd': {
+        case VAR_DICT: {
             var_t* key = va_arg(ap, var_t*);
             var_t* val = va_arg(ap, var_t*);
             res = var_new_dict(key, val);
@@ -266,7 +258,7 @@ var_t* var_new_list(var_t* var, ...) {
         curr->vars[i] = va_arg(ap, var_t*);
     }
     curr = curr->next;
-    for (size_t i = 1; i < res->data.l->len; i += LIST_SIZE) {
+    for (size_t i = LIST_SIZE; i < res->data.l->len; i += LIST_SIZE) {
         for (size_t j = 0; j < LIST_SIZE && i + j < res->data.l->len; j++) {
             curr->vars[j] = va_arg(ap, var_t*);
         }
@@ -351,9 +343,93 @@ var_t* var_new_dict(var_t* key_arr, var_t* val_arr) {
     if (max <= DICT_SIZE) return res;
     max /= DICT_SIZE;
 
-    // TODO: reshape the dictionary, require `dict_reshape`
+    var_dict_reshape(res->data.d, max);
 
     return res;
+}
+
+
+/*
+ * free the memory used by `var_t*`
+ *
+ * @param   var the var you want to free 
+ */
+void var_delete(var_t* var) {
+    (void) var;
+    switch (var->type) {
+        case VAR_INT: {
+            free(var);
+        }
+        break;
+
+        case VAR_UINT: {
+            free(var);
+        }
+        break;
+
+        case VAR_FLOAT: {
+            free(var);
+        }
+        break;
+
+        case VAR_STRING: {
+            free(var->data.s);
+            free(var);
+        }
+        break;
+
+        case VAR_ARRAY: {
+            for (size_t i = 0; i < var->data.a->len; i++) {
+                var_delete(var->data.a->av[i]);
+                free(var->data.a);
+                free(var);
+            }
+        }
+        break;
+
+        case VAR_LIST: {
+            var_node_t* curr = &var->data.l->lv;
+            var_node_t* next;
+            for (size_t i = 0; i < LIST_SIZE && i < var->data.l->len; i++) {
+                var_delete(curr->vars[i]);
+            }
+            for (size_t i = LIST_SIZE; i < var->data.l->len; i += LIST_SIZE) {
+                for (size_t j = 0; j < LIST_SIZE && i + j < var->data.l->len; j++) {
+                    var_delete(curr->vars[i]);
+                }
+                next = curr->next;
+                free(curr);
+                curr = next;
+            }
+            free(var->data.l);
+            free(var);
+        }
+        break;
+
+        case VAR_DICT: {
+            var_dict_t* dict = var->data.d;
+            var_dict_elem_t* curr;
+            var_dict_elem_t* next;
+            for (size_t i = 0; i < dict->mod; i++) {
+                curr = dict->list[i].head;
+                for (size_t j = 0; j < dict->list[i].size; j++) {
+                    var_delete(curr->key);
+                    var_delete(curr->val);
+                    next = curr->next;
+                    free(curr);
+                    curr = next;
+                }
+            }
+            free(dict->list);
+            free(dict);
+            free(var);
+        }
+        break;
+
+        default: {
+            ERRO("corrupted var");
+        }
+    }
 }
 
 
@@ -367,22 +443,22 @@ var_t* var_new_dict(var_t* key_arr, var_t* val_arr) {
  */
 bool var_hash(const var_t* var, uint64_t* hash) {
     switch (var->type) {
-        case 'i': {
+        case VAR_INT: {
             *hash = var->data.i;
             return true;
         }
 
-        case 'u': {
+        case VAR_UINT: {
             *hash = var->data.u;
             return true;
         }
 
-        case 'f': {
+        case VAR_FLOAT: {
             *hash = *(uint64_t*) (&var->data.f);
             return true;
         }
 
-        case 's': {
+        case VAR_STRING: {
             // FNV-1a algorithm for string hashing
             *hash = (uint64_t) DICT_HASH;
             const unsigned char* ptr = (const unsigned char*) var->data.s->str;
@@ -395,7 +471,7 @@ bool var_hash(const var_t* var, uint64_t* hash) {
             return true;
         }
 
-        case 'a': {
+        case VAR_ARRAY: {
             // combining hashes of all vars inside
             // old_hash ^= new_hash + 0x9e3779b97f4a7c15 + (old_hash << 6) + (old_hash >> 2);
             *hash = 0;
@@ -409,11 +485,11 @@ bool var_hash(const var_t* var, uint64_t* hash) {
             return true;
         }
 
-        case 'l': {
+        case VAR_LIST: {
             return false;
         }
 
-        case 'd': {
+        case VAR_DICT: {
             return false;
         }
 
@@ -423,7 +499,6 @@ bool var_hash(const var_t* var, uint64_t* hash) {
     }
     return false;
 }
-
 
 
 size_t foo(void) {
