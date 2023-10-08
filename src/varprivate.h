@@ -87,7 +87,7 @@ struct var_dict_list {
 
 struct var_dict {
     uint64_t            mod;
-    var_dict_list_t     list;
+    var_dict_list_t*    list;
 };
 
 

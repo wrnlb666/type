@@ -1,3 +1,4 @@
+#include "type.h"
 #include "varprivate.h"
 
 // error msgs
@@ -27,14 +28,14 @@ var_t* var_new(var_type_t t, ...) {
     MEM_CHECK(res);
 
     // start varadic arguments
-    va_list ap;
-    va_start(ap, t);
+va_list ap;
+va_start(ap, t);
 
-    switch (t) {
-        case 'i': {
-            res->data.i = va_arg(ap, int64_t);
-        }
-        break;
+switch (t) {
+case 'i': {
+res->data.i = va_arg(ap, int64_t);
+}
+break;
 
         case 'u': {
             res->data.u = va_arg(ap, uint64_t);
@@ -122,7 +123,9 @@ var_t* var_new(var_type_t t, ...) {
         break;
 
         case 'd': {
-            // TODO: dictionary requires struct and hash. 
+            var_t* key = va_arg(ap, var_t*);
+            var_t* val = va_arg(ap, var_t*);
+            res = var_new_dict(key, val);
         }
         break;
         
@@ -145,6 +148,7 @@ var_t* var_new(var_type_t t, ...) {
 var_t* var_new_int(int64_t i) {
     var_t* res = malloc(sizeof (var_t));
     MEM_CHECK(res);
+    res->type = VAR_INT;
     res->data.i = i;
     return res;
 }
@@ -153,6 +157,7 @@ var_t* var_new_int(int64_t i) {
 var_t* var_new_uint(uint64_t u) {
     var_t* res = malloc(sizeof (var_t));
     MEM_CHECK(res);
+    res->type = VAR_UINT;
     res->data.u = u;
     return res;
 }
@@ -161,6 +166,7 @@ var_t* var_new_uint(uint64_t u) {
 var_t* var_new_float(double f) {
     var_t* res = malloc(sizeof (var_t));
     MEM_CHECK(res);
+    res->type = VAR_FLOAT;
     res->data.f = f;
     return res;
 }
@@ -174,6 +180,7 @@ var_t* var_new_float(double f) {
 var_t* var_new_string(const char* s, ...) {
     var_t* res = malloc(sizeof (var_t));
     MEM_CHECK(res);
+    res->type = VAR_STRING;
 
     va_list ap;
     va_start(ap, s);
@@ -200,6 +207,7 @@ var_t* var_new_string(const char* s, ...) {
 var_t* var_new_array(size_t size) {
     var_t* res = malloc(sizeof (var_t));
     MEM_CHECK(res);
+    res->type = VAR_ARRAY;
     res->data.a = malloc(sizeof (var_array_t) + sizeof (var_t*) * size);
     MEM_CHECK(res->data.a);
     res->data.a->len = size;
@@ -208,21 +216,29 @@ var_t* var_new_array(size_t size) {
 
 
 /*
- * @param   var first element of the list
+ * @param   var first element of the list, `NULL` if empty list
  * @param   ... the rest of the elements, should end with `NULL`
  * @return      a new `var_t*` of type `VAR_LIST`
  */
 var_t* var_new_list(var_t* var, ...) {
     var_t* res = malloc(sizeof (var_t));
     MEM_CHECK(res);
-
-    va_list ap;
-    va_start(ap, var);
+    res->type = VAR_LIST;
 
     // allocate struct memory 
     res->data.l = malloc(sizeof (var_list_t));
     MEM_CHECK(res->data.l);
     
+    // return if len is 0
+    if (var == NULL) {
+        res->data.l->len = 0;
+        res->data.l->lv.next = NULL;
+        return res;
+    }
+
+    va_list ap;
+    va_start(ap, var);
+
     // get argument length
     res->data.l->len = 1;
     for (var_t* temp = va_arg(ap, var_t*); 
@@ -263,37 +279,81 @@ var_t* var_new_list(var_t* var, ...) {
 }
 
 
-var_t* var_new_list_empty(void) {
-    var_t* res = malloc(sizeof (var_t));
-    MEM_CHECK(res);
-    res->data.l = malloc(sizeof (var_list_t));
-    MEM_CHECK(res->data.l);
-    res->data.l->len = 0;
-    res->data.l->lv.next = NULL;
-    return res;
-}
-
-
 /*
  * the length of key_arr should be the same with val_arr
- * dict key will be deep copied. 
+ *
+ * NOTE!
+ * since list and dict are not hashable, they cannot be dict key
+ * array containing them will also be unhashable, thus cannot be dict key
  * 
  * @param   key_arr array of keys
  * @param   val_arr array of vals
  * @return          a new `var_t*` of type `VAR_DICT`
  */
-var_t* var_new_dict(const var_t* key_arr, const var_t* val_arr) {
+var_t* var_new_dict(var_t* key_arr, var_t* val_arr) {
     var_t* res = malloc(sizeof (var_t));
     MEM_CHECK(res);
+    res->type = VAR_DICT;
+
     res->data.d = malloc(sizeof (var_dict_t));
     MEM_CHECK(res->data.d);
     res->data.d->mod = DICT_SIZE;
     
-    // TODO: need hash function
+    // len = 0 if NULL 
+    // get len
+    size_t len;
+    if (key_arr == NULL) {
+        len = 0;
+    } else {
+        size_t len = key_arr->data.a->len;
+        if (len != val_arr->data.a->len) {
+            ERRO("key size must be exactly equal to val size");
+        }
+    }
 
-    (void) key_arr;
-    (void) val_arr;
-    return NULL;
+    // alloate memory 
+    res->data.d->list = malloc(sizeof (var_dict_list_t) * DICT_SIZE);
+    MEM_CHECK(res->data.d->list);
+    memset(res->data.d->list, 0, sizeof (var_dict_list_t) * DICT_SIZE);
+
+    // assign values 
+    size_t index;
+    uint64_t hash;
+    var_dict_elem_t* elem;
+    for (size_t i = 0; i < len; i++) {
+        elem = malloc(sizeof (var_dict_elem_t));
+        MEM_CHECK(elem);
+        elem->key = key_arr->data.a->av[i];
+        elem->val = val_arr->data.a->av[i];
+        if (var_hash(elem->key, &hash) == false) {
+            ERRO("failed to hash")
+        }
+        elem->hash = hash;
+        index = hash % DICT_SIZE;
+        elem->prev = res->data.d->list[index].tail;
+        elem->next = NULL;
+        if (res->data.d->list[index].size++ == 0) {
+            res->data.d->list[index].head = elem;
+            res->data.d->list[index].tail = elem;
+        } else {
+            res->data.d->list[index].tail->next = elem;
+            res->data.d->list[index].tail = elem;
+        }
+    }
+
+    size_t max = 0;
+    for (size_t i = 0; i < DICT_SIZE; i++) {
+        if (res->data.d->list[i].size > max) {
+            max = res->data.d->list[i].size;
+        }
+    }
+
+    if (max <= DICT_SIZE) return res;
+    max /= DICT_SIZE;
+
+    // TODO: reshape the dictionary, require `dict_reshape`
+
+    return res;
 }
 
 

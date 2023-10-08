@@ -22,5 +22,19 @@ typedef enum var_type {
 typedef struct var var_t;
 
 
+
+// functions: 
+
+var_t* var_new(var_type_t t, ...);
+var_t* var_new_int(int64_t i);
+var_t* var_new_uint(uint64_t u);
+var_t* var_new_float(double f);
+var_t* var_new_string(const char* s, ...);
+var_t* var_new_array(size_t size);
+var_t* var_new_list(var_t* var, ...);
+var_t* var_new_list_empty(void);
+var_t* var_new_dict(var_t* key_arr, var_t* val_arr);
+bool var_hash(const var_t* var, uint64_t* hash);
+
 #endif  // __TYPE_H__
 
