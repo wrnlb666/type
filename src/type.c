@@ -444,17 +444,17 @@ void var_delete(var_t* var) {
 bool var_hash(const var_t* var, uint64_t* hash) {
     switch (var->type) {
         case VAR_INT: {
-            *hash = var->data.i;
+            memcpy(hash, &var->data.i, sizeof (int64_t));
             return true;
         }
 
         case VAR_UINT: {
-            *hash = var->data.u;
+            memcpy(hash, &var->data.u, sizeof (uint64_t));
             return true;
         }
 
         case VAR_FLOAT: {
-            *hash = *(uint64_t*) (&var->data.f);
+            memcpy(hash, &var->data.f, sizeof (double));
             return true;
         }
 

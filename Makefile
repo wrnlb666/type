@@ -1,7 +1,7 @@
 CC = gcc
 CFLAG = -Wall -Wextra -pedantic -std=c11 -g -O3
 LIB = 
-GCFLAG = -Wall -Wextra -pedantic -std=c11 `pkg-config --cflags bdw-gc` -g -D TYPE_GC
+GCFLAG = -Wall -Wextra -pedantic -std=c11 -D TYPE_GC `pkg-config --cflags bdw-gc` -g -O3
 GCLIB = `pkg-config --libs bdw-gc`
 POST_FIX = 
 ELF_FILES = 
