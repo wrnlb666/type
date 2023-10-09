@@ -192,11 +192,52 @@ var_t* var_new_string(const char* s, ...) {
 }
 
 
+var_t* var_new_array(var_t* var, ...) {
+    var_t* res = malloc(sizeof (var_t));
+    MEM_CHECK(res);
+    res->type = VAR_ARRAY;
+
+    // return if len is 0
+    if (var == NULL) {
+        res->data.a = malloc(sizeof (var_array_t));
+        MEM_CHECK(res->data.a);
+        res->data.a->len = 0;
+        return res;
+    }
+
+    va_list ap;
+    va_start(ap, var);
+
+    // get argument length
+    size_t len = 1;
+    for (var_t* temp = va_arg(ap, var_t*); 
+        temp != NULL; 
+        temp = (len++, va_arg(ap, var_t*)));
+    va_end(ap);    
+    va_start(ap, var);
+
+    // alocate memory
+    res->data.a = malloc(sizeof (var_array_t) + sizeof (var_t*) * len);
+    MEM_CHECK(res->data.a);
+    res->data.a->len = len;
+
+    // assign values 
+    res->data.a->av[0] = var;
+    for (size_t i = 1; i < len; i++) {
+        res->data.a->av[i] = va_arg(ap, var_t*);
+    }
+
+    va_end(ap);
+
+    return res;
+}
+
+
 /*
  * @param   size    size of the array/struct/tuple 
  * @return          an empty array/struct/tuple with size `size`
  */
-var_t* var_new_array(size_t size) {
+var_t* var_new_array_size(size_t size) {
     var_t* res = malloc(sizeof (var_t));
     MEM_CHECK(res);
     res->type = VAR_ARRAY;
@@ -379,11 +420,12 @@ void var_delete(var_t* var) {
         break;
 
         case VAR_ARRAY: {
-            for (size_t i = 0; i < var->data.a->len; i++) {
-                var_delete(var->data.a->av[i]);
-                free(var->data.a);
-                free(var);
+            var_array_t* arr = var->data.a;
+            for (size_t i = 0; i < arr->len; i++) {
+                var_delete(arr->av[i]);
             }
+            free(var->data.a);
+            free(var);
         }
         break;
 
@@ -498,6 +540,165 @@ bool var_hash(const var_t* var, uint64_t* hash) {
         }
     }
     return false;
+}
+
+
+/*
+ * `VAR_DICT` cannot be parsed by `var_get`
+ *
+ * @param   var     the `var_t*` that you want to get from
+ * @param   format  format string of how you want to get the values 
+ * @param   ...     pointer of variable
+ */
+void var_get(const var_t* var, const char* format, ...) {
+    va_list ap;
+    va_start(ap, format);
+
+    var_vget(var, format, ap);
+
+    va_end(ap);
+}
+
+
+void var_vget(const var_t* var, const char* format, va_list ap) {
+    const char* ptr = format;
+    switch (var->type) {
+        case VAR_INT: {
+            switch (*ptr) {
+                case 'i': {
+                    memcpy(va_arg(ap, int64_t*), &var->data.i, sizeof (int64_t));
+                }
+                break;
+                case '_': break;
+
+                default: {
+                    ERRO("parsing failed");
+                }
+            }
+        }
+        break;
+
+        case VAR_UINT: {
+            switch (*ptr) {
+                case 'u': {
+                    memcpy(va_arg(ap, uint64_t*), &var->data.u, sizeof (uint64_t));
+                }
+                break;
+                case '_': break;
+
+                default: {
+                    ERRO("parsing failed");
+                }
+            }
+        }
+        break;
+
+        case VAR_FLOAT: {
+            switch (*ptr) {
+                case 'f': {
+                    memcpy(va_arg(ap, double*), &var->data.f, sizeof (double));
+                }
+                break;
+                case '_': break;
+
+                default: {
+                    ERRO("parsing failed");
+                }
+            }
+        }
+        break;
+
+        case VAR_STRING: {
+            switch (*ptr) {
+                case 's': {
+                    char** str_ptr = va_arg(ap, char**);
+                    *str_ptr = var->data.s->str;
+                }
+                break;
+                case '_': break;
+
+                default: {
+                    ERRO("parsing failed");
+                }
+            }
+        }
+        break;
+
+        case VAR_ARRAY: {
+            switch (*ptr) {
+                case 'a': {
+                    memcpy(va_arg(ap, var_t**), &var, sizeof (var_t*));
+                }
+                break;
+                case '_': break;
+
+                case '(': {
+                    for (size_t i = (ptr++, 0); 
+                        i < var->data.a->len && *ptr != '\0' && *ptr != ')'; 
+                        (ptr++, i++)) {
+                        var_vget(var->data.a->av[i], ptr, ap);
+                    }
+                }
+                break;
+
+                default: {
+                    ERRO("parsing failed");
+                }
+            }
+        }
+        break;
+
+        case VAR_LIST: {
+            switch (*ptr) {
+                case 'l': {
+                    memcpy(va_arg(ap, var_t**), &var, sizeof (var_t*));
+                }
+                break;
+                case '_': break;
+
+                case '[': {
+                    var_list_t* list = var->data.l;
+                    var_node_t* curr = &list->lv;
+                    for (size_t i = (ptr++, 0);
+                        i < list->len && *ptr != '\0' && *ptr != ']';
+                        (ptr++, i++)) {
+                        var_vget(curr->vars[i % LIST_SIZE], ptr, ap);
+                        if (i % LIST_SIZE == 0 && i != 0) {
+                            curr = curr->next;
+                        }
+                    }
+                }
+                break;
+
+                default: {
+                    ERRO("parsing failed");
+                }
+            }
+        }
+        break;
+
+        case VAR_DICT: {
+            switch (*ptr) {
+                case 'd': {
+                    memcpy(va_arg(ap, var_t**), &var, sizeof (var_t*));
+                }
+                break;
+                case '_': break;
+
+                default: {
+                    ERRO("parsing failed");
+                }
+            }
+        }
+        break;
+
+        default: {
+            ERRO("corrupted type");
+        }
+        break;
+    }
+
+    ptr += 1;
 }
 
 
