@@ -569,6 +569,10 @@ void var_vget(const var_t* var, const char* format, va_list ap) {
                     memcpy(va_arg(ap, int64_t*), &var->data.i, sizeof (int64_t));
                 }
                 break;
+                case 'v': {
+                    memcpy(va_arg(ap, var_t**), &var, sizeof (var_t*));
+                }
+                break;
                 case '_': break;
 
                 default: {
@@ -582,6 +586,10 @@ void var_vget(const var_t* var, const char* format, va_list ap) {
             switch (*ptr) {
                 case 'u': {
                     memcpy(va_arg(ap, uint64_t*), &var->data.u, sizeof (uint64_t));
+                }
+                break;
+                case 'v': {
+                    memcpy(va_arg(ap, var_t**), &var, sizeof (var_t*));
                 }
                 break;
                 case '_': break;
@@ -599,6 +607,10 @@ void var_vget(const var_t* var, const char* format, va_list ap) {
                     memcpy(va_arg(ap, double*), &var->data.f, sizeof (double));
                 }
                 break;
+                case 'v': {
+                    memcpy(va_arg(ap, var_t**), &var, sizeof (var_t*));
+                }
+                break;
                 case '_': break;
 
                 default: {
@@ -613,6 +625,10 @@ void var_vget(const var_t* var, const char* format, va_list ap) {
                 case 's': {
                     char** str_ptr = va_arg(ap, char**);
                     *str_ptr = var->data.s->str;
+                }
+                break;
+                case 'v': {
+                    memcpy(va_arg(ap, var_t**), &var, sizeof (var_t*));
                 }
                 break;
                 case '_': break;
@@ -681,6 +697,177 @@ void var_vget(const var_t* var, const char* format, va_list ap) {
             switch (*ptr) {
                 case 'd': {
                     memcpy(va_arg(ap, var_t**), &var, sizeof (var_t*));
+                }
+                break;
+                case '_': break;
+
+                default: {
+                    ERRO("parsing failed");
+                }
+            }
+        }
+        break;
+
+        default: {
+            ERRO("corrupted type");
+        }
+        break;
+    }
+
+    ptr += 1;
+}
+
+
+void var_set(var_t* var, const char* format, ...) {
+    va_list ap;
+    va_start(ap, format);
+
+    var_vset(var, format, ap);
+
+    va_end(ap);
+}
+
+
+void var_vset(var_t* var, const char* format, va_list ap) {
+    const char* ptr = format;
+    switch (var->type) {
+        case VAR_INT: {
+            switch (*ptr) {
+                case 'i': {
+                    var->data.i = va_arg(ap, int64_t);
+                }
+                break;
+                case 'v': {
+                    *var = *va_arg(ap, var_t*);
+                }
+                break;
+                case '_': break;
+
+                default: {
+                    ERRO("parsing failed");
+                }
+            }
+        }
+        break;
+
+        case VAR_UINT: {
+            switch (*ptr) {
+                case 'u': {
+                    var->data.u = va_arg(ap, uint64_t);
+                }
+                break;
+                case 'v': {
+                    *var = *va_arg(ap, var_t*);
+                }
+                break;
+                case '_': break;
+
+                default: {
+                    ERRO("parsing failed");
+                }
+            }
+        }
+        break;
+
+        case VAR_FLOAT: {
+            switch (*ptr) {
+                case 'f': {
+                    var->data.f = va_arg(ap, double);
+                }
+                break;
+                case 'v': {
+                    *var = *va_arg(ap, var_t*);
+                }
+                break;
+                case '_': break;
+
+                default: {
+                    ERRO("parsing failed");
+                }
+            }
+        }
+        break;
+
+        case VAR_STRING: {
+            switch (*ptr) {
+                case 's': {
+                    char* str = va_arg(ap, char*);
+                    size_t str_len = strlen(str);
+                    var->data.s = realloc(var->data.s, sizeof (var_string_t) + sizeof (char) * (str_len + 1));
+                    var->data.s->len = str_len;
+                    strcpy(var->data.s->str, str);
+                }
+                break;
+                case 'v': {
+                    *var = *va_arg(ap, var_t*);
+                }
+                break;
+                case '_': break;
+
+                default: {
+                    ERRO("parsing failed");
+                }
+            }
+        }
+        break;
+
+        case VAR_ARRAY: {
+            switch (*ptr) {
+                case 'a': {
+                    *var = *va_arg(ap, var_t*);
+                }
+                break;
+                case '_': break;
+
+                case '(': {
+                    for (size_t i = (ptr++, 0); 
+                        i < var->data.a->len && *ptr != '\0' && *ptr != ')'; 
+                        (ptr++, i++)) {
+                        var_vset(var->data.a->av[i], ptr, ap);
+                    }
+                }
+                break;
+
+                default: {
+                    ERRO("parsing failed");
+                }
+            }
+        }
+        break;
+
+        case VAR_LIST: {
+            switch (*ptr) {
+                case 'l': {
+                    *var = *va_arg(ap, var_t*);
+                }
+                break;
+                case '_': break;
+
+                case '[': {
+                    var_list_t* list = var->data.l;
+                    var_node_t* curr = &list->lv;
+                    for (size_t i = (ptr++, 0);
+                        i < list->len && *ptr != '\0' && *ptr != ']';
+                        (ptr++, i++)) {
+                        var_vset(curr->vars[i % LIST_SIZE], ptr, ap);
+                        if (i % LIST_SIZE == 0 && i != 0) {
+                            curr = curr->next;
+                        }
+                    }
+                }
+                break;
+
+                default: {
+                    ERRO("parsing failed");
+                }
+            }
+        }
+        break;
+
+        case VAR_DICT: {
+            switch (*ptr) {
+                case 'd': {
+                    *var = *va_arg(ap, var_t*);
                 }
                 break;
                 case '_': break;

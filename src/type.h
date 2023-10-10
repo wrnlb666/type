@@ -39,6 +39,8 @@ void    var_delete(var_t* var);
 bool    var_hash(const var_t* var, uint64_t* hash);
 void    var_get(const var_t* var, const char* format, ...);
 void    var_vget(const var_t* var, const char* format, va_list ap);
+void    var_set(var_t* var, const char* format, ...);
+void    var_vset(var_t* var, const char* format, va_list ap);
 
 #endif  // __TYPE_H__
 
