@@ -10,6 +10,7 @@
 
 
 typedef enum var_type {
+    VAR_NIL     = 'n',  // manad? optional? NULL, nil, None, whatever u want to call it. 
     VAR_INT     = 'i',  // 64 bits integers
     VAR_UINT    = 'u',  // 64 bits unsigned integers
     VAR_FLOAT   = 'f',  // 64 bits double precision floating points
@@ -26,6 +27,9 @@ typedef struct var var_t;
 // functions: 
 
 var_t*  var_new(var_type_t t, ...);
+var_t*  var_news(const char* format, ...);
+var_t*  var_vnews(const char** format, va_list ap);
+var_t*  var_new_nil(void);
 var_t*  var_new_int(int64_t i);
 var_t*  var_new_uint(uint64_t u);
 var_t*  var_new_float(double f);
@@ -38,9 +42,9 @@ var_t*  var_new_dict(var_t* key_arr, var_t* val_arr);
 void    var_delete(var_t* var);
 bool    var_hash(const var_t* var, uint64_t* hash);
 void    var_get(const var_t* var, const char* format, ...);
-void    var_vget(const var_t* var, const char* format, va_list ap);
+void    var_vget(const var_t* var, const char** format, va_list ap);
 void    var_set(var_t* var, const char* format, ...);
-void    var_vset(var_t* var, const char* format, va_list ap);
+void    var_vset(var_t* var, const char** format, va_list ap);
 
 #endif  // __TYPE_H__
 

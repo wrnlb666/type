@@ -24,8 +24,10 @@ var_t* var_new(var_type_t t, ...) {
     va_start(ap, t);
     
     switch (t) {
+        case VAR_NIL: break;
+
         case VAR_INT: {
-        res->data.i = va_arg(ap, int64_t);
+            res->data.i = va_arg(ap, int64_t);
         }
         break;
 
@@ -133,6 +135,236 @@ var_t* var_new(var_type_t t, ...) {
     // set type and ref
     res->type   = t;
 
+    return res;
+}
+
+
+var_t* var_news(const char* format, ...) {
+    va_list ap;
+    va_start(ap, format);
+
+    var_t* res = var_vnews(&format, ap);
+
+    va_end(ap);
+    return res;
+}
+
+
+var_t* var_vnews(const char** format, va_list ap) {
+    var_t* res;
+
+    switch (**format) {
+        // var_t, any `var_t*` will be acceptable
+        case 'v': {
+            res = va_arg(ap, var_t*);
+        }
+        break;
+
+        // nil
+        case 'n': {
+            res = malloc(sizeof (var_t));
+            MEM_CHECK(res);
+            res->type = VAR_NIL;
+        }
+        break;
+
+        // int
+        case 'i': {
+            res = malloc(sizeof (var_t));
+            MEM_CHECK(res);
+            res->type = VAR_INT;
+            res->data.i = va_arg(ap, int64_t);
+        }
+        break;
+
+        // uint
+        case 'u': {
+            res = malloc(sizeof (var_t));
+            MEM_CHECK(res);
+            res->type = VAR_UINT;
+            res->data.u = va_arg(ap, uint64_t); 
+        }
+        break;
+
+        // float 
+        case 'f': {
+            res = malloc(sizeof (var_t));
+            MEM_CHECK(res);
+            res->type = VAR_FLOAT;
+            res->data.f = va_arg(ap, double);
+        }
+        break;
+
+        // string
+        case 's': {
+            res = malloc(sizeof (var_t));
+            MEM_CHECK(res);
+            res->type = VAR_STRING;
+            char* str = va_arg(ap, char*);
+            size_t str_len = strlen(str);
+            res->data.s = malloc(sizeof (var_string_t) + sizeof (char) * (str_len + 1));
+            MEM_CHECK(res->data.s);
+            res->data.s->len = str_len;
+            strcpy(res->data.s->str, str);
+        }
+        break;
+
+        // array 
+        case 'a': {
+            res = va_arg(ap, var_t*);
+            if (res->type != VAR_ARRAY) {
+                ERRO("parsing failed");
+            }
+        }
+        break;
+
+        // array with initialization 
+        case '(': {
+            res = malloc(sizeof (var_t));
+            MEM_CHECK(res);
+            res->type = VAR_ARRAY;
+
+            // get array length 
+            size_t          a       = 1;            // nested array
+            size_t          l       = 0;            // nested list
+            size_t          len     = 0;            // array length 
+            const char*     curr    = *format + 1;  // curr pos in format string 
+
+            for (; a != 0; curr++) {
+                switch (*curr) {
+                    case '(': {
+                        a++;
+                    }
+                    break;
+                    case ')': {
+                        a--;
+                    }
+                    break;
+                    case '[': {
+                        l++;
+                    }
+                    break;
+                    case ']': {
+                        l--;
+                    }
+                    break;
+                }
+                if (a == 1 && l == 0) {
+                    len++;
+                }
+            }
+
+            // allocate memory 
+            res->data.a = malloc(sizeof (var_array_t) + sizeof (var_t*) * len);
+            MEM_CHECK(res->data.a);
+
+            // assign value
+            (*format)++;
+            res->data.a->len = len;
+            for (size_t i = 0; i < len; i++) {
+                res->data.a->av[i] = var_vnews(format, ap);
+            }
+        }
+        break;
+
+        // list 
+        case 'l': {
+            res = va_arg(ap, var_t*);
+            if (res->type != VAR_LIST) {
+                ERRO("parsing failed");
+            }
+        }
+        break;
+
+        // list with initalization
+        case '[': {
+            res = malloc(sizeof (var_t));
+            MEM_CHECK(res);
+            res->type = VAR_LIST;
+            
+            // get array length 
+            size_t          a   = 0;            // nested array
+            size_t          l   = 1;            // nested list
+            size_t          len = 0;            // array length 
+            const char*     c   = *format + 1;  // curr pos in format string 
+
+            for (; l != 0; c++) {
+                switch (*c) {
+                    case '(': {
+                        a++;
+                    }
+                    break;
+                    case ')': {
+                        a--;
+                    }
+                    break;
+                    case '[': {
+                        l++;
+                    }
+                    break;
+                    case ']': {
+                        l--;
+                    }
+                    break;
+                }
+                if (a == 0 && l == 1) {
+                    len++;
+                }
+            }
+
+            // allocate memory 
+            res->data.l         = malloc(sizeof (var_list_t));
+            res->data.l->len    = len;
+            
+            // total node count 
+            size_t node_count   = (len + LIST_SIZE - 1) / LIST_SIZE;
+            
+            // allocate node memory 
+            var_node_t* curr = &(res->data.l->lv);
+            for (size_t i = 1; i < node_count; i++) {
+                curr->next = malloc(sizeof (var_node_t));
+                MEM_CHECK(curr->next);
+                curr = curr->next;
+            }
+            curr->next = NULL;
+
+
+            // assign values
+            (*format)++;
+            curr = &(res->data.l->lv);
+            for (size_t i = 0; i < len; i += LIST_SIZE) {
+                for (size_t j = 0; j < LIST_SIZE && i + j < len; j++) {
+                    curr->vars[j] = var_vnews(format, ap);
+                }
+                curr = curr->next;
+            }
+        }
+        break;
+
+        // dict 
+        case 'd': {
+            res = va_arg(ap, var_t*);
+            if (res->type != VAR_DICT) {
+                ERRO("parsing failed");
+            }
+        }
+        break;
+
+        default: {
+            ERRO("parsing failed");
+        }
+    }
+
+    (*format)++;
+
+    return res;
+}
+
+
+var_t* var_new_nil(void) {
+    var_t* res = malloc(sizeof (var_t));
+    MEM_CHECK(res);
+    res->type = VAR_NIL;
     return res;
 }
 
@@ -554,15 +786,30 @@ void var_get(const var_t* var, const char* format, ...) {
     va_list ap;
     va_start(ap, format);
 
-    var_vget(var, format, ap);
+    var_vget(var, &format, ap);
 
     va_end(ap);
 }
 
 
-void var_vget(const var_t* var, const char* format, va_list ap) {
-    const char* ptr = format;
+void var_vget(const var_t* var, const char** format, va_list ap) {
+    const char* ptr = *format;
     switch (var->type) {
+        case VAR_NIL: {
+            switch(*ptr) {
+                case 'n':
+                case 'v': {
+                    memcpy(va_arg(ap, var_t**), &var, sizeof (var_t*));
+                }
+                case '_': break;
+
+                default: {
+                    ERRO("try to dereference nil");
+                }
+            }
+        }
+        break;
+
         case VAR_INT: {
             switch (*ptr) {
                 case 'i': {
@@ -646,13 +893,17 @@ void var_vget(const var_t* var, const char* format, va_list ap) {
                     memcpy(va_arg(ap, var_t**), &var, sizeof (var_t*));
                 }
                 break;
+                case 'v': {
+                    memcpy(va_arg(ap, var_t**), &var, sizeof (var_t*));
+                }
+                break;
                 case '_': break;
 
                 case '(': {
                     for (size_t i = (ptr++, 0); 
                         i < var->data.a->len && *ptr != '\0' && *ptr != ')'; 
-                        (ptr++, i++)) {
-                        var_vget(var->data.a->av[i], ptr, ap);
+                        i++) {
+                        var_vget(var->data.a->av[i], &ptr, ap);
                     }
                 }
                 break;
@@ -670,6 +921,10 @@ void var_vget(const var_t* var, const char* format, va_list ap) {
                     memcpy(va_arg(ap, var_t**), &var, sizeof (var_t*));
                 }
                 break;
+                case 'v': {
+                    memcpy(va_arg(ap, var_t**), &var, sizeof (var_t*));
+                }
+                break;
                 case '_': break;
 
                 case '[': {
@@ -677,8 +932,8 @@ void var_vget(const var_t* var, const char* format, va_list ap) {
                     var_node_t* curr = &list->lv;
                     for (size_t i = (ptr++, 0);
                         i < list->len && *ptr != '\0' && *ptr != ']';
-                        (ptr++, i++)) {
-                        var_vget(curr->vars[i % LIST_SIZE], ptr, ap);
+                        i++) {
+                        var_vget(curr->vars[i % LIST_SIZE], &ptr, ap);
                         if (i % LIST_SIZE == 0 && i != 0) {
                             curr = curr->next;
                         }
@@ -699,6 +954,10 @@ void var_vget(const var_t* var, const char* format, va_list ap) {
                     memcpy(va_arg(ap, var_t**), &var, sizeof (var_t*));
                 }
                 break;
+                case 'v': {
+                    memcpy(va_arg(ap, var_t**), &var, sizeof (var_t*));
+                }
+                break;
                 case '_': break;
 
                 default: {
@@ -714,7 +973,7 @@ void var_vget(const var_t* var, const char* format, va_list ap) {
         break;
     }
 
-    ptr += 1;
+    (*format)++;
 }
 
 
@@ -722,15 +981,30 @@ void var_set(var_t* var, const char* format, ...) {
     va_list ap;
     va_start(ap, format);
 
-    var_vset(var, format, ap);
+    var_vset(var, &format, ap);
 
     va_end(ap);
 }
 
 
-void var_vset(var_t* var, const char* format, va_list ap) {
-    const char* ptr = format;
+void var_vset(var_t* var, const char** format, va_list ap) {
+    const char* ptr = *format;
     switch (var->type) {
+        case VAR_NIL: {
+            switch (*ptr) {
+                case 'v': {
+                    *var = *va_arg(ap, var_t*);
+                }
+                break;
+                case '_': break;
+
+                default: {
+                    ERRO("parsing failed");
+                }
+            }
+        }
+        break;
+
         case VAR_INT: {
             switch (*ptr) {
                 case 'i': {
@@ -817,13 +1091,17 @@ void var_vset(var_t* var, const char* format, va_list ap) {
                     *var = *va_arg(ap, var_t*);
                 }
                 break;
+                case 'v': {
+                    *var = *va_arg(ap, var_t*);
+                }
+                break;
                 case '_': break;
 
                 case '(': {
                     for (size_t i = (ptr++, 0); 
                         i < var->data.a->len && *ptr != '\0' && *ptr != ')'; 
-                        (ptr++, i++)) {
-                        var_vset(var->data.a->av[i], ptr, ap);
+                        i++) {
+                        var_vset(var->data.a->av[i], &ptr, ap);
                     }
                 }
                 break;
@@ -841,6 +1119,10 @@ void var_vset(var_t* var, const char* format, va_list ap) {
                     *var = *va_arg(ap, var_t*);
                 }
                 break;
+                case 'v': {
+                    *var = *va_arg(ap, var_t*);
+                }
+                break;
                 case '_': break;
 
                 case '[': {
@@ -848,8 +1130,8 @@ void var_vset(var_t* var, const char* format, va_list ap) {
                     var_node_t* curr = &list->lv;
                     for (size_t i = (ptr++, 0);
                         i < list->len && *ptr != '\0' && *ptr != ']';
-                        (ptr++, i++)) {
-                        var_vset(curr->vars[i % LIST_SIZE], ptr, ap);
+                        i++) {
+                        var_vset(curr->vars[i % LIST_SIZE], &ptr, ap);
                         if (i % LIST_SIZE == 0 && i != 0) {
                             curr = curr->next;
                         }
@@ -870,6 +1152,10 @@ void var_vset(var_t* var, const char* format, va_list ap) {
                     *var = *va_arg(ap, var_t*);
                 }
                 break;
+                case 'v': {
+                    *var = *va_arg(ap, var_t*);
+                }
+                break;
                 case '_': break;
 
                 default: {
@@ -885,7 +1171,7 @@ void var_vset(var_t* var, const char* format, va_list ap) {
         break;
     }
 
-    ptr += 1;
+    (*format)++;
 }
 
 
