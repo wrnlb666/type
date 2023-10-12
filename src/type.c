@@ -977,6 +977,26 @@ void var_vget(const var_t* var, const char** format, va_list ap) {
 }
 
 
+/*
+ * data type:
+ *      n: VAR_NIL  
+ *      i: VAR_INT       
+ *      u: VAR_UINT 
+ *      f: VAR_FLOAT 
+ *      l: VAR_LIST 
+ *      d: VAR_DICT
+ * 
+ * other valid input: 
+ *      _: ignored
+ *      v: `var_t*`, it must be of the same type as before, it is passed by value, u need to destroy the original `var_t*` manually
+ *      (): setting fields of array 
+ *      []: setting fields of list 
+ *
+ *
+ * @param   var     the `var_t*` that you want to change
+ * @param   format  the format of the `var_t*`, see above
+ * @param   ...     the argument of format
+ */
 void var_set(var_t* var, const char* format, ...) {
     va_list ap;
     va_start(ap, format);
@@ -993,7 +1013,9 @@ void var_vset(var_t* var, const char** format, va_list ap) {
         case VAR_NIL: {
             switch (*ptr) {
                 case 'v': {
-                    *var = *va_arg(ap, var_t*);
+                    var_t* temp = va_arg(ap, var_t*);
+                    *var = *temp;
+                    // TODO: require `var_copy`
                 }
                 break;
                 case '_': break;
@@ -1011,8 +1033,16 @@ void var_vset(var_t* var, const char** format, va_list ap) {
                     var->data.i = va_arg(ap, int64_t);
                 }
                 break;
+                case 'n': {
+                    var->type = VAR_NIL;
+                }
+                break;
                 case 'v': {
-                    *var = *va_arg(ap, var_t*);
+                    var_t* temp = va_arg(ap, var_t*);
+                    if (temp->type != VAR_INT) {
+                        ERRO("parsing failed, expected type `VAR_INT`");
+                    }
+                    var->data = temp->data;
                 }
                 break;
                 case '_': break;
@@ -1030,8 +1060,16 @@ void var_vset(var_t* var, const char** format, va_list ap) {
                     var->data.u = va_arg(ap, uint64_t);
                 }
                 break;
+                case 'n': {
+                    var->type = VAR_NIL;
+                }
+                break;
                 case 'v': {
-                    *var = *va_arg(ap, var_t*);
+                    var_t* temp = va_arg(ap, var_t*);
+                    if (temp->type != VAR_UINT) {
+                        ERRO("parsing failed, expected type `VAR_UINT`");
+                    }
+                    var->data = temp->data;
                 }
                 break;
                 case '_': break;
@@ -1049,8 +1087,17 @@ void var_vset(var_t* var, const char** format, va_list ap) {
                     var->data.f = va_arg(ap, double);
                 }
                 break;
+                case 'n': {
+                    var->type = VAR_NIL;
+                }
+                break;
                 case 'v': {
-                    *var = *va_arg(ap, var_t*);
+                    var_t* temp = va_arg(ap, var_t*);
+                    if (temp->type != VAR_FLOAT) {
+                        ERRO("parsing failed, expected type `VAR_FLOAT`");
+                    }
+                    var->data = temp->data;
+
                 }
                 break;
                 case '_': break;
@@ -1072,8 +1119,17 @@ void var_vset(var_t* var, const char** format, va_list ap) {
                     strcpy(var->data.s->str, str);
                 }
                 break;
+                case 'n': {
+                    var->type = VAR_NIL;
+                    free(var->data.s);
+                }
+                break;
                 case 'v': {
-                    *var = *va_arg(ap, var_t*);
+                    var_t* temp = va_arg(ap, var_t*);
+                    if (temp->type != VAR_STRING) {
+                        ERRO("parsing failed, expected type `VAR_STRING`");
+                    }
+                    // TODO: require `var_copy`
                 }
                 break;
                 case '_': break;
@@ -1089,6 +1145,11 @@ void var_vset(var_t* var, const char** format, va_list ap) {
             switch (*ptr) {
                 case 'a': {
                     *var = *va_arg(ap, var_t*);
+                }
+                break;
+                case 'n': {
+                    var->type = VAR_NIL;
+                    free(var->data.a);
                 }
                 break;
                 case 'v': {
@@ -1117,6 +1178,25 @@ void var_vset(var_t* var, const char** format, va_list ap) {
             switch (*ptr) {
                 case 'l': {
                     *var = *va_arg(ap, var_t*);
+                }
+                break;
+                case 'n': {
+                    var->type = VAR_NIL;
+                    var_node_t* curr = &var->data.l->lv;
+                    var_node_t* next;
+                    for (size_t i = 0; i < LIST_SIZE && i < var->data.l->len; i++) {
+                        var_delete(curr->vars[i]);
+                    }
+                    for (size_t i = LIST_SIZE; i < var->data.l->len; i += LIST_SIZE) {
+                        for (size_t j = 0; j < LIST_SIZE && i + j < var->data.l->len; j++) {
+                            var_delete(curr->vars[i]);
+                        }
+                        next = curr->next;
+                        free(curr);
+                        curr = next;
+                    }
+                    free(var->data.l);
+                    free(var);
                 }
                 break;
                 case 'v': {
@@ -1152,6 +1232,26 @@ void var_vset(var_t* var, const char** format, va_list ap) {
                     *var = *va_arg(ap, var_t*);
                 }
                 break;
+                case 'n': {
+                    var->type = VAR_NIL;
+                    var_dict_t* dict = var->data.d;
+                    var_dict_elem_t* curr;
+                    var_dict_elem_t* next;
+                    for (size_t i = 0; i < dict->mod; i++) {
+                        curr = dict->list[i].head;
+                        for (size_t j = 0; j < dict->list[i].size; j++) {
+                            var_delete(curr->key);
+                            var_delete(curr->val);
+                            next = curr->next;
+                            free(curr);
+                            curr = next;
+                        }
+                    }
+                    free(dict->list);
+                    free(dict);
+                    free(var);
+                }
+                break;
                 case 'v': {
                     *var = *va_arg(ap, var_t*);
                 }
@@ -1173,5 +1273,59 @@ void var_vset(var_t* var, const char** format, va_list ap) {
 
     (*format)++;
 }
+
+size_t var_len(const var_t* var) {
+    switch (var->type) {
+        case VAR_NIL: {
+            ERRO("type `VAR_NIL` does not have len");
+        }
+        break;
+
+        case VAR_INT: {
+            ERRO("type `VAR_INT` does not have len");
+        }
+        break;
+
+        case VAR_UINT: {
+            ERRO("type `VAR_UINT` does not have len");
+        }
+        break;
+
+        case VAR_FLOAT: {
+            ERRO("type `VAR_FLOAT` does not have len");
+        }
+        break;
+
+        case VAR_STRING: {
+            return var->data.s->len;
+        }
+        break;
+
+        case VAR_ARRAY: {
+            return var->data.a->len;
+        }
+        break;
+
+        case VAR_LIST: {
+            return var->data.l->len;
+        }
+        break;
+
+        case VAR_DICT: {
+            size_t len = 0;
+            for (size_t i = 0; i < var->data.d->mod; i++) {
+                len += var->data.d->list->size;
+            }
+            return len;
+        }
+        break;
+
+        default: {
+            ERRO("unknown type");
+        }
+    }
+    ERRO("unknown type");
+}
+
 
 
