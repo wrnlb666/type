@@ -804,7 +804,7 @@ void var_vget(const var_t* var, const char** format, va_list ap) {
                 case '_': break;
 
                 default: {
-                    ERRO("try to dereference nil");
+                    ERRO("parsing failed, try to dereference nil");
                 }
             }
         }
@@ -823,7 +823,7 @@ void var_vget(const var_t* var, const char** format, va_list ap) {
                 case '_': break;
 
                 default: {
-                    ERRO("parsing failed");
+                    ERRO("parsing failed, expected type `VAR_INT`");
                 }
             }
         }
@@ -842,7 +842,7 @@ void var_vget(const var_t* var, const char** format, va_list ap) {
                 case '_': break;
 
                 default: {
-                    ERRO("parsing failed");
+                    ERRO("parsing failed, expected type `VAR_UINT`");
                 }
             }
         }
@@ -861,7 +861,7 @@ void var_vget(const var_t* var, const char** format, va_list ap) {
                 case '_': break;
 
                 default: {
-                    ERRO("parsing failed");
+                    ERRO("parsing failed, expected type `VAR_FLOAT`");
                 }
             }
         }
@@ -881,7 +881,7 @@ void var_vget(const var_t* var, const char** format, va_list ap) {
                 case '_': break;
 
                 default: {
-                    ERRO("parsing failed");
+                    ERRO("parsing failed, expected type `VAR_STRING`");
                 }
             }
         }
@@ -909,7 +909,7 @@ void var_vget(const var_t* var, const char** format, va_list ap) {
                 break;
 
                 default: {
-                    ERRO("parsing failed");
+                    ERRO("parsing failed, expected type `VAR_ARRAY`");
                 }
             }
         }
@@ -942,7 +942,7 @@ void var_vget(const var_t* var, const char** format, va_list ap) {
                 break;
 
                 default: {
-                    ERRO("parsing failed");
+                    ERRO("parsing failed, expected type `VAR_LIST`");
                 }
             }
         }
@@ -961,7 +961,7 @@ void var_vget(const var_t* var, const char** format, va_list ap) {
                 case '_': break;
 
                 default: {
-                    ERRO("parsing failed");
+                    ERRO("parsing failed, expected type `VAR_DICT`");
                 }
             }
         }
@@ -999,7 +999,7 @@ void var_vset(var_t* var, const char** format, va_list ap) {
                 case '_': break;
 
                 default: {
-                    ERRO("parsing failed");
+                    ERRO("parsing failed, expected type `var_t*`");
                 }
             }
         }
@@ -1018,7 +1018,7 @@ void var_vset(var_t* var, const char** format, va_list ap) {
                 case '_': break;
 
                 default: {
-                    ERRO("parsing failed");
+                    ERRO("parsing failed, expected type `VAR_INT`");
                 }
             }
         }
@@ -1037,7 +1037,7 @@ void var_vset(var_t* var, const char** format, va_list ap) {
                 case '_': break;
 
                 default: {
-                    ERRO("parsing failed");
+                    ERRO("parsing failed, expected type `VAR_UINT`");
                 }
             }
         }
@@ -1056,7 +1056,7 @@ void var_vset(var_t* var, const char** format, va_list ap) {
                 case '_': break;
 
                 default: {
-                    ERRO("parsing failed");
+                    ERRO("parsing failed, expected type `VAR_FLOAT`");
                 }
             }
         }
@@ -1079,7 +1079,7 @@ void var_vset(var_t* var, const char** format, va_list ap) {
                 case '_': break;
 
                 default: {
-                    ERRO("parsing failed");
+                    ERRO("parsing failed, expected type `VAR_STRING`");
                 }
             }
         }
@@ -1107,7 +1107,7 @@ void var_vset(var_t* var, const char** format, va_list ap) {
                 break;
 
                 default: {
-                    ERRO("parsing failed");
+                    ERRO("parsing failed, expected type `VAR_ARRAY`");
                 }
             }
         }
@@ -1140,7 +1140,7 @@ void var_vset(var_t* var, const char** format, va_list ap) {
                 break;
 
                 default: {
-                    ERRO("parsing failed");
+                    ERRO("parsing failed, expected type `VAR_LIST`");
                 }
             }
         }
@@ -1159,7 +1159,7 @@ void var_vset(var_t* var, const char** format, va_list ap) {
                 case '_': break;
 
                 default: {
-                    ERRO("parsing failed");
+                    ERRO("parsing failed, expected type `VAR_DICT`");
                 }
             }
         }
@@ -1175,6 +1175,3 @@ void var_vset(var_t* var, const char** format, va_list ap) {
 }
 
 
-size_t foo(void) {
-    return sizeof (var_t);
-}
