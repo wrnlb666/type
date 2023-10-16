@@ -18,4 +18,4 @@ Runtime type system for C.
 * (): array with values
 * []: list with values 
 
-e.g.: `(u[si])` meaning an array containing a uint and a list containing a string and an int
+e.g.: `(u[si])` meaning an `array` containing a `uint` and a `list` containing a `string` and an `int`

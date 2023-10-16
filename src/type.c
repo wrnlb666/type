@@ -793,6 +793,7 @@ void var_get(const var_t* var, const char* format, ...) {
 
 
 void var_vget(const var_t* var, const char** format, va_list ap) {
+    while (**format == ' ') (*format)++;
     const char* ptr = *format;
     switch (var->type) {
         case VAR_NIL: {
@@ -1008,6 +1009,7 @@ void var_set(var_t* var, const char* format, ...) {
 
 
 void var_vset(var_t* var, const char** format, va_list ap) {
+    while (**format == ' ') (*format)++;
     const char* ptr = *format;
     switch (var->type) {
         case VAR_NIL: {
